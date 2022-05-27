@@ -44,7 +44,7 @@ def main():
   args = parser.parse_args()
   xla_flags = "--xla_cpu_enable_xprof_traceme"
   if args.num_devices is not None:
-    xla_flags += f",--xla_force_host_platform_device_count={args.num_devices}"
+    xla_flags += f" --xla_force_host_platform_device_count={args.num_devices}"
 
   os.environ["XLA_FLAGS"] = xla_flags
   print(f"XLA_FLAGS: {os.environ['XLA_FLAGS']}")
