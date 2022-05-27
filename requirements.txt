@@ -1,0 +1,10 @@
+absl-py==1.0.0
+jax==0.3.13
+jaxlib==0.3.10
+numpy==1.22.4
+scipy==1.8.1
+tbp-nightly==2.9.0a20220527
+tensorboard==2.9.0
+tensorboard-data-server==0.6.1
+tensorboard-plugin-wit==1.8.1
+tensorflow==2.9.1
