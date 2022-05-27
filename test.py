@@ -12,7 +12,7 @@ parser.add_argument(
        help='Place to log profiles.')
 parser.add_argument(
        '--method', type=str, default='vmap',
-       choices=['pmap', 'vmap', 'pmap-of-vmap', 'xmap', 'none'],
+       choices=['pmap', 'vmap', 'pmap-of-vmap', 'pmap-of-map', 'xmap', 'none'],
        help='How to parallelize the function.')
 parser.add_argument(
        '--parallelism', type=int, default=1000,
@@ -42,9 +42,12 @@ def multiply(key, dim, num_muls):
 
 def main():
   args = parser.parse_args()
+  os.environ["XLA_FLAGS"] = "--xla_cpu_enable_xprof_traceme"
   if args.num_devices is not None:
-    os.environ["XLA_FLAGS"] = f"--xla_force_host_platform_device_count={args.num_devices}"
+    os.environ["XLA_FLAGS"] = f"$XLA_FLAGS,--xla_force_host_platform_device_count={args.num_devices}"
     print(f"Set number of XLA devices to {args.num_devices}, JAX now sees {jax.local_device_count()} devices.")
+
+  print(f"XLA_FLAGS: {os.environ['XLA_FLAGS']}")
   with jax.profiler.trace(args.logdir):
     k = jax.random.PRNGKey(args.seed)
     f = jax.jit(partial(multiply, dim=args.dim, num_muls=args.num_muls))
@@ -60,16 +63,22 @@ def main():
       print(f"Running with pmap, parallelism {args.parallelism}, num_devices {jax.local_device_count()}.")
       keys = jax.random.split(k, num=args.parallelism)
       out = pmap(f)(keys)
-    elif args.method == 'pmap-of-vmap':
+    elif args.method == 'pmap-of-vmap' or args.method == 'pmap-of-map':
       num_devices = jax.local_device_count()
       assert args.parallelism % num_devices == 0, \
               f"Num devices {num_devices} does not evenly divide parallelism {args.parallelism}"
       num_per_device = args.parallelism // num_devices
       keys = jax.random.split(k, num=args.parallelism)
       keys = jnp.reshape(keys, [num_devices, num_per_device, -1])
-      print(f"Running pmap-of-vmap, parallelism {args.parallelism}," \
-            f" num_devices {jax.local_device_count()}, num_per_device {num_per_device}.")
-      out = pmap(vmap(f))(keys)
+      if args.method == 'pmap-of-vmap':
+        print(f"Running pmap-of-vmap, parallelism {args.parallelism}," \
+              f" num_devices {jax.local_device_count()}, num_per_device {num_per_device}.")
+        out = pmap(vmap(f))(keys)
+      elif args.method == 'pmap-of-map':
+        print(f"Running pmap-of-map, parallelism {args.parallelism}," \
+              f" num_devices {jax.local_device_count()}, num_per_device {num_per_device}.")
+        fn = lambda ks: jax.lax.map(f, ks)
+        out = pmap(fn)(keys)
 
     assert out is not None
     out.block_until_ready()
