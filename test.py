@@ -42,12 +42,17 @@ def multiply(key, dim, num_muls):
 
 def main():
   args = parser.parse_args()
-  os.environ["XLA_FLAGS"] = "--xla_cpu_enable_xprof_traceme"
+  xla_flags = "--xla_cpu_enable_xprof_traceme"
   if args.num_devices is not None:
-    os.environ["XLA_FLAGS"] = f"$XLA_FLAGS,--xla_force_host_platform_device_count={args.num_devices}"
-    print(f"Set number of XLA devices to {args.num_devices}, JAX now sees {jax.local_device_count()} devices.")
+    xla_flags += f",--xla_force_host_platform_device_count={args.num_devices}"
 
+  os.environ["XLA_FLAGS"] = xla_flags
   print(f"XLA_FLAGS: {os.environ['XLA_FLAGS']}")
+
+  if args.num_devices is not None:
+    print(f"Set number of XLA devices to {args.num_devices}," \
+          f" JAX now sees {jax.local_device_count()} devices.")
+
   with jax.profiler.trace(args.logdir):
     k = jax.random.PRNGKey(args.seed)
     f = jax.jit(partial(multiply, dim=args.dim, num_muls=args.num_muls))
